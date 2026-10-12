@@ -19,7 +19,7 @@ from snip import __version__
 from snip.aliases import expand_aliases, parse_aliases
 
 EDITOR_HEADER = """\
-# snip: enter one command per line, then save and quit to run them.
+# snip: commands go above, one per line; save and quit to run them.
 # Blank lines and lines starting with '#' are skipped.
 # A line ending in '\\' continues onto the next line.
 """
@@ -91,12 +91,13 @@ def parse_commands(text):
     return commands
 
 
-def read_editor():
+def read_editor(initial=""):
     editor = shlex.split(os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi")
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "snip.sh")
         with open(path, "w") as f:
-            f.write(EDITOR_HEADER)
+            # Commands first, so line 1 is ready for typing or pasting.
+            f.write(f"{initial}\n\n{EDITOR_HEADER}")
         subprocess.run([*editor, path], check=True)
         # Reopen by path: many editors save by replacing the file.
         with open(path) as f:

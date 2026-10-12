@@ -144,6 +144,17 @@ def test_editor_replacing_file(clip, monkeypatch, tmp_path):
     assert clip[0] == "$ echo edited\nedited\n"
 
 
+def test_editor_buffer_starts_blank(clip, monkeypatch, tmp_path):
+    seen = tmp_path / "seen"
+    editor = tmp_path / "editor.sh"
+    editor.write_text(f'#!/bin/sh\ncp "$1" {seen}\n')
+    editor.chmod(0o755)
+    monkeypatch.setenv("VISUAL", str(editor))
+    monkeypatch.setattr("sys.stdin", type("TTY", (), {"isatty": lambda self: True})())
+    cli.main([])
+    assert seen.read_text() == "\n\n" + cli.EDITOR_HEADER
+
+
 def test_editor_unchanged_aborts(clip, monkeypatch):
     monkeypatch.setenv("VISUAL", "true")
     monkeypatch.setattr("sys.stdin", type("TTY", (), {"isatty": lambda self: True})())
