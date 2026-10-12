@@ -141,7 +141,8 @@ def run(commands):
 def sanitize(text):
     home = os.path.expanduser("~")
     if home and home != "/":
-        text = text.replace(home, "~")
+        # Only at a path boundary, so /Users/me2 isn't rewritten as ~2.
+        text = re.sub(re.escape(home) + r"(?![\w-])", "~", text)
     text = ANSI_RE.sub("", text)
     # Line numbers refer to the generated driver script, not anything the reader has.
     return re.sub(r"^bash: line \d+: ", "bash: ", text, flags=re.M)

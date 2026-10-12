@@ -121,6 +121,12 @@ def test_home_replacement_is_literal(clip, monkeypatch):
     assert clip[0].endswith("/hxme ~/x\n")
 
 
+def test_home_replacement_needs_path_boundary(clip, monkeypatch):
+    monkeypatch.setenv("HOME", "/home/me")
+    cli.main(["echo /home/me2/x /home/me-old /home/me/x /home/me: /home/me"])
+    assert clip[0].endswith("/home/me2/x /home/me-old ~/x ~: ~\n")
+
+
 def test_alias_expansion(clip, monkeypatch):
     monkeypatch.setenv("SNIP_ALIASES", "alias say='echo hello'\n")
     cli.main(["say there | tr a-z A-Z"])
