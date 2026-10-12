@@ -7,9 +7,10 @@ from snip import cli
 
 
 @pytest.fixture
-def clip(monkeypatch):
+def clip(monkeypatch, tmp_path):
     """Capture clipboard writes instead of touching the real clipboard."""
     monkeypatch.delenv("SNIP_ALIASES", raising=False)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     got = []
     monkeypatch.setattr(cli, "copy", got.append)
     return got
@@ -160,6 +161,44 @@ def test_editor_unchanged_aborts(clip, monkeypatch):
     monkeypatch.setattr("sys.stdin", type("TTY", (), {"isatty": lambda self: True})())
     assert cli.main([]) == 1
     assert clip == []
+
+
+def test_last_commands_saved_unexpanded(clip, monkeypatch):
+    monkeypatch.setenv("SNIP_ALIASES", "alias say='echo hello'\n")
+    cli.main(["say there", "true"])
+    with open(cli.state_path()) as f:
+        assert f.read() == "say there\ntrue\n"
+    assert os.stat(cli.state_path()).st_mode & 0o777 == 0o600
+
+
+def test_edit_reruns_unchanged(clip, monkeypatch):
+    cli.main(["echo one"])
+    monkeypatch.setenv("VISUAL", "true")
+    assert cli.main(["-e"]) == 0
+    assert clip[1] == "$ echo one\none\n"
+
+
+def test_edit_applies_changes(clip, monkeypatch, tmp_path):
+    cli.main(["echo one"])
+    editor = tmp_path / "editor.sh"
+    editor.write_text(
+        '#!/bin/sh\nsed "s/one/two/" "$1" > "$1.new" && mv "$1.new" "$1"\n'
+    )
+    editor.chmod(0o755)
+    monkeypatch.setenv("VISUAL", str(editor))
+    assert cli.main(["-e"]) == 0
+    assert clip[1] == "$ echo two\ntwo\n"
+
+
+def test_edit_without_previous(clip):
+    assert cli.main(["-e"]) == 1
+    assert clip == []
+
+
+def test_edit_with_commands_is_usage_error(clip):
+    with pytest.raises(SystemExit) as e:
+        cli.main(["-e", "echo hi"])
+    assert e.value.code == 2
 
 
 @pytest.mark.parametrize("shell", ["zsh", "bash"])

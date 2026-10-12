@@ -147,6 +147,20 @@ def sanitize(text):
     return re.sub(r"^bash: line \d+: ", "bash: ", text, flags=re.M)
 
 
+def state_path():
+    base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+    return os.path.join(base, "snip", "last.sh")
+
+
+def save_last(commands):
+    """Remember the commands as typed, so `snip -e` can edit and re-run them."""
+    path = state_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(commands) + "\n")
+
+
 def copy(text):
     for cmd in (["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"]):
         if shutil.which(cmd[0]):
@@ -166,16 +180,33 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="snip",
         description="Run commands in a clean bash and copy the transcript. "
-        "Commands come from arguments, else stdin (one per line), else $EDITOR.",
+        "Commands come from arguments, else stdin (one per line), else $EDITOR. "
+        "Use -e to edit and re-run the previous commands.",
     )
     ap.add_argument("commands", nargs="*", metavar="CMD", help="a command to run")
     ap.add_argument("-f", action="store_true", help="copy even if a secret matched")
     ap.add_argument("-n", action="store_true", help="print transcript, don't copy")
+    ap.add_argument(
+        "-e",
+        "--edit",
+        action="store_true",
+        help="edit the previous commands in $EDITOR, then run",
+    )
     ap.add_argument("-V", "--version", action="version", version=__version__)
     args = ap.parse_args(argv)
+    if args.edit and args.commands:
+        ap.error("-e can't be combined with commands")
 
     try:
-        if args.commands:
+        if args.edit:
+            try:
+                with open(state_path()) as f:
+                    previous = f.read()
+            except FileNotFoundError:
+                note("snip: no previous commands", "31")
+                return 1
+            commands = parse_commands(read_editor(previous.rstrip("\n")))
+        elif args.commands:
             commands = [c.strip() for c in args.commands]
         else:
             text = read_editor() if sys.stdin.isatty() else sys.stdin.read()
@@ -186,6 +217,10 @@ def main(argv=None):
     if not commands:
         note("snip: no commands, aborting", "31")
         return 1
+    try:
+        save_last(commands)
+    except OSError as e:
+        note(f"snip: couldn't save commands for -e: {e}", "33")
 
     aliases = parse_aliases(os.environ.get("SNIP_ALIASES", ""))
     commands = [expand_aliases(c, aliases) for c in commands]

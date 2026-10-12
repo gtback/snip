@@ -21,6 +21,7 @@ copies the result to the clipboard.
   continuations.
 - **Alias expansion:** aliases from your shell are expanded in the transcript, so
   readers see commands they can run.
+- **Edit and re-run:** `snip -e` reopens the previous commands in your editor.
 - **Snip what you just ran:** `resnip` and a key binding (`Ctrl-X s`) for zsh and
   bash.
 - **Tidy output:** `$HOME` becomes `~`, ANSI escapes are stripped, and the status
@@ -41,6 +42,7 @@ pipx install .        # or: uv tool install .
 snip 'kubectl get ns' 'kubectl get pods -A'   # each argument is a command
 snip < repro.txt                              # one command per line on stdin
 snip                                          # opens $VISUAL/$EDITOR
+snip -e                                       # edit and re-run the previous snip
 ```
 
 From stdin or the editor, blank lines and `#` lines are skipped and a trailing
@@ -61,6 +63,12 @@ transcript shows commands a reader can actually run.
 | ---- | ------ |
 | `-f` | copy even if a secret pattern matched |
 | `-n` | print the transcript to stdout instead of copying |
+| `-e` | edit the previous commands in `$VISUAL`/`$EDITOR`, then run |
+
+The commands of each run are saved as typed (aliases unexpanded) in
+`${XDG_STATE_HOME:-~/.local/state}/snip/last.sh`, readable only by you. A
+multi-line command passed as a single argument without `\` continuations comes
+back from `-e` as separate lines.
 
 Clipboard: `pbcopy`, else `wl-copy`, else `xclip`.
 
