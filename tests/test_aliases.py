@@ -29,6 +29,14 @@ def test_segments():
     assert expand_aliases(cmd, A) == want
 
 
+def test_redirections_are_not_separators():
+    a = {**A, "1": "cd +1", "out": "cd +2"}
+    for cmd in ("k x 2>&1", "k x >&1", "k x &>out", "k x &> out", "k x <&1"):
+        want = cmd.replace("k x", "kubectl x", 1)
+        assert expand_aliases(cmd, a) == want
+    assert expand_aliases("k x |& k y", A) == "kubectl x |& kubectl y"
+
+
 def test_recursive_and_self_reference():
     assert expand_aliases("g ns", A) == "kubectl get ns"
     assert expand_aliases("ls /", A) == "ls --color /"

@@ -91,6 +91,9 @@ def expand_aliases(cmd, aliases, _seen=frozenset()):
             else:
                 stack.append("bt")
                 start = True
+        elif c == "&" and (cmd[i - 1 : i] in ("<", ">") or cmd[i + 1 : i + 2] == ">"):
+            # Redirection (`2>&1`, `>&2`, `&>file`), not a command separator.
+            start = False
         elif c in "|&;\n":
             start = True
         elif c.isspace() or c in "<>":
